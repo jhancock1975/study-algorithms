@@ -4,15 +4,12 @@
   <meta charset="UTF-8">
   <title>Binary Tree Renderer</title>
   <style>
-    /* General Styles */
     body {
       font-family: Arial, sans-serif;
       margin: 20px;
       background: linear-gradient(to bottom, #f0f4f8, #d9e2ec);
       color: #333;
     }
-
-    /* Title Styling */
     h2 {
       text-align: center;
       font-family: 'Pacifico', cursive;
@@ -20,8 +17,6 @@
       color: #2b6cb0;
       margin-bottom: 10px;
     }
-
-    /* Textarea Styling */
     textarea {
       width: 100%;
       height: 150px;
@@ -32,13 +27,10 @@
       padding: 10px;
       box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
     }
-
-    /* Controls Styling */
     #controls {
       margin: 10px 0;
       text-align: center;
     }
-
     button {
       background-color: #2b6cb0;
       color: white;
@@ -49,12 +41,9 @@
       cursor: pointer;
       box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
     }
-
     button:hover {
       background-color: #2c5282;
     }
-
-    /* Tree Container Styling */
     #tree-container {
       border: 1px solid #ccc;
       border-radius: 5px;
@@ -64,34 +53,18 @@
       background: white;
       box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
     }
-
     svg {
       width: 100%;
       height: 100%;
     }
-
-    /* Node Styling */
-    .node circle {
-      fill: url(#node-gradient);
-      stroke: #2b6cb0;
-      stroke-width: 2px;
-      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
-    }
-
-    .node text {
-      font-size: 14px;
-      font-weight: bold;
-      fill: #2b6cb0;
-      text-anchor: middle;
-      dominant-baseline: central;
-      pointer-events: none;
-    }
-
-    /* Edge Styling */
     .edge {
       stroke: #4a5568;
       stroke-width: 2px;
       stroke-linecap: round;
+    }
+    /* Remove this if you don't want the gradient at all */
+    .gradient-circle {
+      fill: url(#node-gradient);
     }
   </style>
 </head>
@@ -117,7 +90,6 @@
   </div>
   <div id="tree-container">
     <svg id="tree-svg">
-      <!-- Gradient Definition -->
       <defs>
         <linearGradient id="node-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" style="stop-color:#63b3ed;stop-opacity:1" />
@@ -129,106 +101,105 @@
 
   <script>
     document.getElementById('render-btn').addEventListener('click', () => {
-      const input = document.getElementById('json-input').value;
-      let data;
+      let treeData;
       try {
-        data = JSON.parse(input);
+        treeData = JSON.parse(document.getElementById('json-input').value).tree;
       } catch (e) {
-        alert('Invalid JSON: ' + e.message);
-        return;
+        return alert('Invalid JSON: ' + e.message);
       }
-      if (!data.tree || !data.tree.nodes || !data.tree.root) {
-        alert('JSON must have a "tree" object with "nodes" array and "root" id.');
-        return;
+      if (!treeData?.nodes || !treeData.root) {
+        return alert('JSON must have a "tree" object with "nodes" array and "root" id.');
       }
-      renderTree(data.tree);
+      renderTree(treeData);
     });
-
-    function renderTree(tree) {
-      const nodesById = {};
-      tree.nodes.forEach(n => nodesById[n.id] = { ...n });
-      Object.values(nodesById).forEach(n => {
-        n.leftNode = n.left ? nodesById[n.left] : null;
-        n.rightNode = n.right ? nodesById[n.right] : null;
+  
+    function renderTree({ nodes, root: rootId }) {
+      const lookup = Object.fromEntries(nodes.map(n => [n.id, { ...n }]));
+      Object.values(lookup).forEach(n => {
+        n.leftNode  = n.left  ? lookup[n.left]  : null;
+        n.rightNode = n.right ? lookup[n.right] : null;
       });
-
+  
       const levelHeight = 80;
-      const nodeRadius = 14; // Reduced node size by 30%
+      const r = 14;
       let maxX = 0;
-
-      function measure(node) {
+  
+      const measure = node => {
         if (!node) return { width: 0, height: 0 };
-        const left = measure(node.leftNode);
-        const right = measure(node.rightNode);
-        node._subtreeWidth = Math.max(left.width + right.width + 40, nodeRadius * 2);
-        node._height = Math.max(left.height, right.height) + levelHeight;
-        return { width: node._subtreeWidth, height: node._height };
-      }
-
-      function layout(node, x, y, level) {
+        const L = measure(node.leftNode);
+        const R = measure(node.rightNode);
+        node._w = Math.max(L.width + R.width + 40, r * 2);
+        node._h = Math.max(L.height, R.height) + levelHeight;
+        return { width: node._w, height: node._h };
+      };
+  
+      const layout = (node, x, y, lvl) => {
         if (!node) return;
-        const left = node.leftNode;
-        const right = node.rightNode;
-        node.x = x + node._subtreeWidth / 2;
+        node.x = x + node._w / 2;
         node.y = y;
-        node.level = level; // Track the level for alternating colors
+        node.level = lvl;
         maxX = Math.max(maxX, node.x);
-        if (left) {
-          layout(left, x, y + levelHeight, level + 1);
-        }
-        if (right) {
-          const leftWidth = left ? left._subtreeWidth : 0;
-          layout(right, x + leftWidth + 40, y + levelHeight, level + 1);
-        }
-      }
-
-      const root = nodesById[tree.root];
+        layout(node.leftNode,  x,                 y + levelHeight, lvl + 1);
+        layout(node.rightNode, x + (node.leftNode? node.leftNode._w : 0) + 40, y + levelHeight, lvl + 1);
+      };
+  
+      const root = lookup[rootId];
       measure(root);
-      layout(root, 0, nodeRadius + 10, 0);
-
+      layout(root, 0, r + 10, 0);
+  
       const svg = document.getElementById('tree-svg');
-      svg.innerHTML = '';
-      const width = Math.max(maxX + nodeRadius + 20, 300);
-      const height = root._height + nodeRadius + 20;
-      svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
-
-      Object.values(nodesById).forEach(n => {
-        ['leftNode', 'rightNode'].forEach(dir => {
-          const child = n[dir];
-          if (child) {
-            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            line.setAttribute('x1', n.x);
-            line.setAttribute('y1', n.y + nodeRadius);
-            line.setAttribute('x2', child.x);
-            line.setAttribute('y2', child.y - nodeRadius);
-            line.setAttribute('class', 'edge');
-            svg.appendChild(line);
-          }
+      svg.innerHTML = svg.querySelector('defs').outerHTML; // keep defs if you want
+      const W = Math.max(maxX + r + 20, 300);
+      const H = root._h + r + 20;
+      svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  
+      // Edges
+      Object.values(lookup).forEach(n => {
+        [n.leftNode, n.rightNode].forEach(child => {
+          if (!child) return;
+          const line = document.createElementNS(svg.namespaceURI, 'line');
+          line.setAttribute('x1', n.x);
+          line.setAttribute('y1', n.y + r);
+          line.setAttribute('x2', child.x);
+          line.setAttribute('y2', child.y - r);
+          line.classList.add('edge');
+          svg.appendChild(line);
         });
       });
-
-      Object.values(nodesById).forEach(n => {
-        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-        g.setAttribute('class', 'node');
-        const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  
+      // Nodes
+      Object.values(lookup).forEach(n => {
+        const g = document.createElementNS(svg.namespaceURI, 'g');
+  
+        // Pink on even levels, blue on odd
+        const fill = n.level % 2 === 0
+          ? '#f687b3'
+          : '#2b6cb0';
+  
+        const c = document.createElementNS(svg.namespaceURI, 'circle');
         c.setAttribute('cx', n.x);
         c.setAttribute('cy', n.y);
-        c.setAttribute('r', nodeRadius);
-        // Alternate colors based on level
-        const fillColor = n.level % 2 === 0 ? '#63b3ed' : '#2b6cb0';
-        c.setAttribute('fill', fillColor);
+        c.setAttribute('r',  r);
+        c.setAttribute('fill', fill);
         c.setAttribute('stroke', '#2b6cb0');
-        c.setAttribute('stroke-width', '2');
+        c.setAttribute('stroke-width', 2);
         g.appendChild(c);
-        const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  
+        const t = document.createElementNS(svg.namespaceURI, 'text');
         t.setAttribute('x', n.x);
         t.setAttribute('y', n.y);
+        t.setAttribute('text-anchor', 'middle');
+        t.setAttribute('dominant-baseline', 'central');
+        t.style.font = 'bold 14px Arial';
+        t.style.fill = '#fff';
         t.textContent = n.value;
         g.appendChild(t);
+  
         svg.appendChild(g);
       });
     }
   </script>
+  
 
 </body>
 </html>
