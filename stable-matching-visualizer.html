@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stable Matching Visualizer</title>
+  <style>
+    body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; }
+    #container { display: flex; gap: 50px; margin-top: 20px; }
+    .panel { border: 1px solid #ccc; padding: 10px; width: 200px; }
+    .panel h2 { text-align: center; }
+    ul { list-style: none; padding: 0; }
+    li { padding: 5px; margin: 3px 0; border: 1px solid #ddd; border-radius: 4px; transition: background 0.5s; }
+    .highlight { background: #ffeb3b; }
+    #nextBtn { margin-top: 20px; padding: 10px 20px; font-size: 16px; }
+  </style>
+</head>
+<body>
+  <h1>Stable Matching Visualizer</h1>
+  <div id="container">
+    <div class="panel">
+      <h2>Free Interns</h2>
+      <ul id="internsList"></ul>
+    </div>
+    <div class="panel">
+      <h2>Team Matches</h2>
+      <ul id="teamsList"></ul>
+    </div>
+  </div>
+  <button id="nextBtn">Next Step</button>
+  <script>
+    // Example preferences (you can edit these)
+    const internPrefs = [
+      [0, 1, 2], // Intern 0 prefers Team0, then Team1, Team2
+      [1, 0, 2], // Intern 1 prefers Team1, then Team0, Team2
+      [1, 2, 0]  // Intern 2 prefers Team1, then Team2, Team0
+    ];
+    const teamPrefs = [
+      [1, 0, 2], // Team0 prefers Intern1, then Intern0, Intern2
+      [1, 2, 0], // Team1 prefers Intern1, then Intern2, Intern0
+      [0, 1, 2]  // Team2 prefers Intern0, then Intern1, Intern2
+    ];
+
+    let freeInterns = [];
+    let internNextChoice = [];
+    let teamsCurrent = {};
+    let teamRankings = [];
+
+    function init() {
+      freeInterns = [...Array(internPrefs.length).keys()];
+      internNextChoice = Array(internPrefs.length).fill(0);
+      teamsCurrent = {};
+      teamRankings = teamPrefs.map(prefList => {
+        const map = {};
+        prefList.forEach((i, idx) => map[i] = idx);
+        return map;
+      });
+      render();
+    }
+
+    function render(highlight = {}) {
+      const internsList = document.getElementById('internsList');
+      internsList.innerHTML = '';
+      freeInterns.forEach(i => {
+        const li = document.createElement('li');
+        li.textContent = `Intern ${i}`;
+        if (highlight.intern === i) li.classList.add('highlight');
+        internsList.appendChild(li);
+      });
+
+      const teamsList = document.getElementById('teamsList');
+      teamsList.innerHTML = '';
+      for (let t = 0; t < teamPrefs.length; t++) {
+        const li = document.createElement('li');
+        li.textContent = teamsCurrent[t] != null ? `Team ${t} → Intern ${teamsCurrent[t]}` : `Team ${t} → None`;
+        if (highlight.team === t) li.classList.add('highlight');
+        teamsList.appendChild(li);
+      }
+    }
+
+    function nextStep() {
+      if (freeInterns.length === 0) return;
+      const intern = freeInterns.pop();
+      const choiceIdx = internNextChoice[intern]++;
+      const team = internPrefs[intern][choiceIdx];
+
+      // Highlight the proposing intern and chosen team
+      render({intern, team});
+
+      if (teamsCurrent[team] == null) {
+        teamsCurrent[team] = intern;
+      } else {
+        const current = teamsCurrent[team];
+        // Who is preferred?
+        if (teamRankings[team][intern] < teamRankings[team][current]) {
+          freeInterns.push(current);
+          teamsCurrent[team] = intern;
+        } else {
+          freeInterns.push(intern);
+        }
+      }
+
+      // Re-render without highlights after a short delay
+      setTimeout(() => render(), 500);
+    }
+
+    document.getElementById('nextBtn').addEventListener('click', nextStep);
+    init();
+  </script>
+</body>
+</html>
