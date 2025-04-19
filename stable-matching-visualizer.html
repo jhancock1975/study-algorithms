@@ -6,13 +6,17 @@
   <title>Stable Matching Visualizer</title>
   <style>
     body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; }
-    #container { display: flex; gap: 50px; margin-top: 20px; }
-    .panel { border: 1px solid #ccc; padding: 10px; width: 200px; }
-    .panel h2 { text-align: center; }
-    ul { list-style: none; padding: 0; }
-    li { padding: 5px; margin: 3px 0; border: 1px solid #ddd; border-radius: 4px; transition: background 0.5s; }
-    .highlight { background: #ffeb3b; }
-    #nextBtn { margin-top: 20px; padding: 10px 20px; font-size: 16px; }
+    #container { display: grid; grid-template-columns: repeat(4, 200px); gap: 20px; margin-top: 20px; }
+    .panel { border: 1px solid #ccc; padding: 10px; }
+    .panel h2 { text-align: center; margin: 0 0 10px; font-size: 16px; }
+    ul { list-style: none; padding: 0; margin: 0; }
+    li { padding: 4px; margin: 2px 0; border: 1px solid #ddd; border-radius: 4px; transition: background 0.3s; }
+    .highlight { background: #ffe082; }
+    pre { background: #f5f5f5; padding: 5px; overflow-x: auto; font-size: 12px; line-height: 1.2; }
+    .code-line { padding: 1px 4px; }
+    .code-highlight { background: #c8e6c9; }
+    #controls { margin-top: 20px; }
+    #nextBtn { padding: 6px 12px; font-size: 14px; }
   </style>
 </head>
 <body>
@@ -23,89 +27,122 @@
       <ul id="internsList"></ul>
     </div>
     <div class="panel">
-      <h2>Team Matches</h2>
+      <h2>Teams Current</h2>
       <ul id="teamsList"></ul>
     </div>
+    <div class="panel">
+      <h2>Intern Next Choice</h2>
+      <pre id="choiceView"></pre>
+    </div>
+    <div class="panel">
+      <h2>Team Rankings</h2>
+      <pre id="rankingsView"></pre>
+    </div>
+    <div class="panel">
+      <h2>Intern Preferences</h2>
+      <pre id="prefsView"></pre>
+    </div>
+    <div class="panel">
+      <h2>Data Snapshot</h2>
+      <pre id="dataView"></pre>
+    </div>
+    <div class="panel" style="grid-column: span 4;">
+      <h2>Code Execution</h2>
+      <pre id="codeView"></pre>
+    </div>
   </div>
-  <button id="nextBtn">Next Step</button>
+  <div id="controls">
+    <button id="nextBtn">Next Step</button>
+  </div>
+
   <script>
-    // Example preferences (you can edit these)
-    const internPrefs = [
-      [0, 1, 2], // Intern 0 prefers Team0, then Team1, Team2
-      [1, 0, 2], // Intern 1 prefers Team1, then Team0, Team2
-      [1, 2, 0]  // Intern 2 prefers Team1, then Team2, Team0
-    ];
-    const teamPrefs = [
-      [1, 0, 2], // Team0 prefers Intern1, then Intern0, Intern2
-      [1, 2, 0], // Team1 prefers Intern1, then Intern2, Intern0
-      [0, 1, 2]  // Team2 prefers Intern0, then Intern1, Intern2
-    ];
+    // Preferences
+    const internPrefs = [[0,1,2],[1,0,2],[1,2,0]];
+    const teamPrefs = [[1,0,2],[1,2,0],[0,1,2]];
 
-    let freeInterns = [];
-    let internNextChoice = [];
-    let teamsCurrent = {};
-    let teamRankings = [];
+    // Algorithm state
+    let freeInterns, internNextChoice, teamsCurrent, teamRankings;
+    let codeLines;
+    let step = 0;
 
+    // Initialize
     function init() {
       freeInterns = [...Array(internPrefs.length).keys()];
       internNextChoice = Array(internPrefs.length).fill(0);
       teamsCurrent = {};
-      teamRankings = teamPrefs.map(prefList => {
+      teamRankings = teamPrefs.map(list => {
         const map = {};
-        prefList.forEach((i, idx) => map[i] = idx);
+        list.forEach((i, idx) => map[i] = idx);
         return map;
       });
+      // Load code text
+      const src = document.getElementById('srcCode').textContent.trim();
+      codeLines = src.split('\n');
       render();
     }
 
-    function render(highlight = {}) {
-      const internsList = document.getElementById('internsList');
-      internsList.innerHTML = '';
-      freeInterns.forEach(i => {
-        const li = document.createElement('li');
-        li.textContent = `Intern ${i}`;
-        if (highlight.intern === i) li.classList.add('highlight');
-        internsList.appendChild(li);
+    // Render all panels
+    function render(highlight={}){
+      // Free interns
+      const internsList = document.getElementById('internsList'); internsList.innerHTML='';
+      freeInterns.forEach(i=>{const li=document.createElement('li');li.textContent=`Intern ${i}`; if(highlight.intern===i)li.classList.add('highlight'); internsList.appendChild(li);});
+      // Teams
+      const teamsList = document.getElementById('teamsList'); teamsList.innerHTML='';
+      teamPrefs.forEach((_,t)=>{const li=document.createElement('li');const cur=teamsCurrent[t];li.textContent=cur!=null?`Team ${t}->Intern ${cur}`:`Team ${t}->None`; if(highlight.team===t)li.classList.add('highlight'); teamsList.appendChild(li);});
+      // Intern next choice
+      document.getElementById('choiceView').textContent = JSON.stringify(internNextChoice);
+      // Rankings
+      document.getElementById('rankingsView').textContent = JSON.stringify(teamRankings,null,2);
+      // Prefs
+      document.getElementById('prefsView').textContent = JSON.stringify(internPrefs,null,2);
+      // Data snapshot
+      document.getElementById('dataView').textContent =
+        `freeInterns: ${JSON.stringify(freeInterns)}\n`+
+        `internNextChoice: ${JSON.stringify(internNextChoice)}\n`+
+        `teamsCurrent: ${JSON.stringify(teamsCurrent)}`;
+      // Code
+      const codeView = document.getElementById('codeView'); codeView.innerHTML='';
+      codeLines.forEach((line,i)=>{
+        const div=document.createElement('div'); div.textContent=line;
+        div.classList.add('code-line');
+        if(i===highlight.line) div.classList.add('code-highlight');
+        codeView.appendChild(div);
       });
-
-      const teamsList = document.getElementById('teamsList');
-      teamsList.innerHTML = '';
-      for (let t = 0; t < teamPrefs.length; t++) {
-        const li = document.createElement('li');
-        li.textContent = teamsCurrent[t] != null ? `Team ${t} → Intern ${teamsCurrent[t]}` : `Team ${t} → None`;
-        if (highlight.team === t) li.classList.add('highlight');
-        teamsList.appendChild(li);
-      }
     }
 
-    function nextStep() {
-      if (freeInterns.length === 0) return;
+    // Perform one step and highlight code
+    function nextStep(){
+      const hil = { line: null };
+      if(freeInterns.length===0){ render(); return; }
+      // Pop intern
+      hil.line = codeLines.findIndex(l=>l.includes('const intern = freeInterns.pop')); render(hil);
       const intern = freeInterns.pop();
-      const choiceIdx = internNextChoice[intern]++;
-      const team = internPrefs[intern][choiceIdx];
-
-      // Highlight the proposing intern and chosen team
-      render({intern, team});
-
-      if (teamsCurrent[team] == null) {
-        teamsCurrent[team] = intern;
-      } else {
-        const current = teamsCurrent[team];
-        // Who is preferred?
-        if (teamRankings[team][intern] < teamRankings[team][current]) {
-          freeInterns.push(current);
-          teamsCurrent[team] = intern;
-        } else {
-          freeInterns.push(intern);
-        }
+      // Choice update
+      hil.line = codeLines.findIndex(l=>l.includes('internNextChoice[intern]')); render(hil);
+      const choice = internNextChoice[intern]++;
+      // Select team
+      hil.line = codeLines.findIndex(l=>l.includes('const team = internPrefs')); render(hil);
+      const team = internPrefs[intern][choice];
+      // Proposal
+      hil.line = codeLines.findIndex(l=>l.includes('if (teamsCurrent[team]')); render(hil);
+      if(teamsCurrent[team]==null){ hil.line++; render(hil); teamsCurrent[team]=intern; }
+      else{
+        hil.line = codeLines.findIndex(l=>l.includes('if (teamRankings[team]')); render(hil);
+        const current=teamsCurrent[team];
+        hil.line++; render(hil);
+        if(teamRankings[team][intern]<teamRankings[team][current]){ hil.line++; render(hil); freeInterns.push(current); teamsCurrent[team]=intern; }
+        else{ hil.line++; render(hil); freeInterns.push(intern); }
       }
-
-      // Re-render without highlights after a short delay
-      setTimeout(() => render(), 500);
+      setTimeout(()=>render(),300);
     }
 
-    document.getElementById('nextBtn').addEventListener('click', nextStep);
-    init();
+    document.getElementById('nextBtn').onclick=nextStep;
+    document.body.insertAdjacentHTML('beforeend',
+      '<script id="srcCode" type="text/plain">'+
+      document.querySelector('script').textContent+
+      '<\/script>'
+    );
+    window.onload=init;
   </script>
 </body>
 </html>
