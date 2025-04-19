@@ -118,7 +118,111 @@
     <button id="nextBtn">Next Step</button>
   </div>
 
-  <script>
+  <script id="srcCode" type="text/plain">
+// Preferences
+const internPrefs = [[0,1,2],[1,0,2],[1,2,0]];
+const teamPrefs = [[1,0,2],[1,2,0],[0,1,2]];
+
+// Algorithm state variables
+let freeInterns, internNextChoice, teamsCurrent, teamRankings, codeLines;
+
+function init() {
+  freeInterns = [...Array(internPrefs.length).keys()];
+  internNextChoice = Array(internPrefs.length).fill(0);
+  teamsCurrent = {};
+  teamRankings = teamPrefs.map(list => {
+    const map = {};
+    list.forEach((i, idx) => map[i] = idx);
+    return map;
+  });
+  // Capture source for highlighting
+  const src = document.getElementById('srcCode').textContent.trim();
+  codeLines = src.split('
+');
+  render();
+}
+
+function render(highlight = {}) {
+  // Free interns
+  const internsList = document.getElementById('internsList'); internsList.innerHTML = '';
+  freeInterns.forEach(i => {
+    const li = document.createElement('li'); li.textContent = `Intern ${i}`;
+    if (highlight.intern === i) li.classList.add('highlight'); internsList.appendChild(li);
+  });
+  // Teams current matches
+  const teamsList = document.getElementById('teamsList'); teamsList.innerHTML = '';
+  teamPrefs.forEach((_, t) => {
+    const li = document.createElement('li'); const cur = teamsCurrent[t];
+    li.textContent = cur != null ? `Team ${t} → Intern ${cur}` : `Team ${t} → None`;
+    if (highlight.team === t) li.classList.add('highlight'); teamsList.appendChild(li);
+  });
+  // Intern Next Choice
+  document.getElementById('choiceView').textContent = JSON.stringify(internNextChoice);
+  // Team Rankings
+  document.getElementById('rankingsView').textContent = JSON.stringify(teamRankings, null, 2);
+  // Intern Preferences
+  document.getElementById('prefsView').textContent = JSON.stringify(internPrefs, null, 2);
+  // Data Snapshot
+  document.getElementById('dataView').textContent =
+    `freeInterns: ${JSON.stringify(freeInterns)}
+` +
+    `internNextChoice: ${JSON.stringify(internNextChoice)}
+` +
+    `teamsCurrent: ${JSON.stringify(teamsCurrent)}`;
+  // Code Execution
+  const codeView = document.getElementById('codeView'); codeView.innerHTML = '';
+  codeLines.forEach((line, i) => {
+    const div = document.createElement('div'); div.textContent = line;
+    div.classList.add('code-line');
+    if (i === highlight.line) div.classList.add('code-highlight');
+    codeView.appendChild(div);
+  });
+}
+
+function nextStep() {
+  const hil = { line: null };
+  if (freeInterns.length === 0) { render(); return; }
+  // Pop intern
+  hil.line = codeLines.findIndex(l => l.includes('const intern = freeInterns.pop'));
+  render(hil);
+  const intern = freeInterns.pop();
+  // Update choice
+  hil.line = codeLines.findIndex(l => l.includes('internNextChoice[intern]'));
+  render(hil);
+  const choice = internNextChoice[intern]++;
+  // Select team
+  hil.line = codeLines.findIndex(l => l.includes('const team = internPrefs'));
+  render(hil);
+  const team = internPrefs[intern][choice];
+  // Proposal logic
+  hil.line = codeLines.findIndex(l => l.includes('if (teamsCurrent[team]')); render(hil);
+  if (teamsCurrent[team] == null) {
+    hil.line++;
+    render(hil);
+    teamsCurrent[team] = intern;
+  } else {
+    hil.line = codeLines.findIndex(l => l.includes('if (teamRankings[team]'));
+    render(hil);
+    const current = teamsCurrent[team];
+    hil.line++;
+    render(hil);
+    if (teamRankings[team][intern] < teamRankings[team][current]) {
+      hil.line++;
+      render(hil);
+      freeInterns.push(current);
+      teamsCurrent[team] = intern;
+    } else {
+      hil.line++;
+      render(hil);
+      freeInterns.push(intern);
+    }
+  }
+  setTimeout(() => render(), 300);
+}
+
+document.getElementById('nextBtn').onclick = nextStep;
+window.onload = init;
+</script>
     // Preferences
     const internPrefs = [[0,1,2],[1,0,2],[1,2,0]];
     const teamPrefs = [[1,0,2],[1,2,0],[0,1,2]];
