@@ -5,23 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Stable Matching Visualizer</title>
   <style>
-    body { font-family: sans-serif; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; }
-    #container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; width: 100%; max-width: 1600px; padding: 16px; box-sizing: border-box; }
-    .panel { border: 1px solid #ccc; padding: 8px; background: #fff; overflow: auto; }
-    .panel h2 { margin: 0 0 8px; font-size: 14px; text-align: center; }
-    ul { list-style: none; padding: 0; margin: 0; max-height: 200px; overflow-y: auto; }
-    li { padding: 2px 4px; margin: 2px 0; border: 1px solid #ddd; border-radius: 3px; font-size: 12px; transition: background 0.3s; }
+    body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; }
+    #container { display: grid; grid-template-columns: repeat(4, 200px); gap: 20px; margin-top: 20px; }
+    .panel { border: 1px solid #ccc; padding: 10px; }
+    .panel h2 { text-align: center; margin: 0 0 10px; font-size: 16px; }
+    ul { list-style: none; padding: 0; margin: 0; }
+    li { padding: 4px; margin: 2px 0; border: 1px solid #ddd; border-radius: 4px; transition: background 0.3s; }
     .highlight { background: #ffe082; }
-    pre { background: #f5f5f5; padding: 4px; margin: 0; font-size: 11px; line-height: 1.2; max-height: 200px; overflow: auto; }
-    .code-line { padding: 1px 2px; }
+    pre { background: #f5f5f5; padding: 5px; overflow-x: auto; font-size: 12px; line-height: 1.2; }
+    .code-line { padding: 1px 4px; }
     .code-highlight { background: #c8e6c9; }
-    #codePanel { grid-column: 1 / -1; max-height: 400px; }
-    #controls { margin: 16px; }
+    #controls { margin-top: 20px; }
     #nextBtn { padding: 6px 12px; font-size: 14px; }
   </style>
 </head>
 <body>
-  <h1 style="font-size:18px; margin:16px 0;">Stable Matching Visualizer</h1>
+  <h1>Stable Matching Visualizer</h1>
   <div id="container">
     <div class="panel">
       <h2>Free Interns</h2>
@@ -47,7 +46,7 @@
       <h2>Data Snapshot</h2>
       <pre id="dataView"></pre>
     </div>
-    <div class="panel" id="codePanel">
+    <div class="panel" style="grid-column: span 4;">
       <h2>Code Execution</h2>
       <pre id="codeView"></pre>
     </div>
@@ -56,75 +55,94 @@
     <button id="nextBtn">Next Step</button>
   </div>
 
-  <!-- Source code for highlighting -->
-  <script id="srcCode" type="text/plain">
-// Preferences
-const internPrefs = [[0,1,2],[1,0,2],[1,2,0]];
-const teamPrefs = [[1,0,2],[1,2,0],[0,1,2]];
+  <script>
+    // Preferences
+    const internPrefs = [[0,1,2],[1,0,2],[1,2,0]];
+    const teamPrefs = [[1,0,2],[1,2,0],[0,1,2]];
 
-// State
-let freeInterns, internNextChoice, teamsCurrent, teamRankings, codeLines;
+    // Algorithm state
+    let freeInterns, internNextChoice, teamsCurrent, teamRankings;
+    let codeLines;
+    let step = 0;
 
-function init() {
-  freeInterns = [...Array(internPrefs.length).keys()];
-  internNextChoice = Array(internPrefs.length).fill(0);
-  teamsCurrent = {};
-  teamRankings = teamPrefs.map(list => list.reduce((m,i,idx) => (m[i]=idx, m), {}));
-  codeLines = document.getElementById('srcCode').textContent.trim().split('\n');
-  render();
-}
+    // Initialize
+    function init() {
+      freeInterns = [...Array(internPrefs.length).keys()];
+      internNextChoice = Array(internPrefs.length).fill(0);
+      teamsCurrent = {};
+      teamRankings = teamPrefs.map(list => {
+        const map = {};
+        list.forEach((i, idx) => map[i] = idx);
+        return map;
+      });
+      // Load code text
+      const src = document.getElementById('srcCode').textContent.trim();
+      codeLines = src.split('\n');
+      render();
+    }
 
-function render(highlight={}){
-  // Free interns
-  const internsList = document.getElementById('internsList'); internsList.innerHTML='';
-  freeInterns.forEach(i=>{
-    const li=document.createElement('li'); li.textContent=`Intern ${i}`;
-    if(highlight.intern===i) li.classList.add('highlight'); internsList.appendChild(li);
-  });
-  // Teams
-  const teamsList = document.getElementById('teamsList'); teamsList.innerHTML='';
-  teamPrefs.forEach((_,t)=>{
-    const li=document.createElement('li'); const c=teamsCurrent[t];
-    li.textContent=c!=null?`Team ${t} → Intern ${c}`:`Team ${t} → None`;
-    if(highlight.team===t) li.classList.add('highlight'); teamsList.appendChild(li);
-  });
-  // Panels
-  document.getElementById('choiceView').textContent = JSON.stringify(internNextChoice);
-  document.getElementById('rankingsView').textContent = JSON.stringify(teamRankings,null,2);
-  document.getElementById('prefsView').textContent = JSON.stringify(internPrefs,null,2);
-  document.getElementById('dataView').textContent =
-    `freeInterns: ${JSON.stringify(freeInterns)}\n`+
-    `internNextChoice: ${JSON.stringify(internNextChoice)}\n`+
-    `teamsCurrent: ${JSON.stringify(teamsCurrent)}`;
-  // Code
-  const codeView=document.getElementById('codeView'); codeView.innerHTML='';
-  codeLines.forEach((l,i)=>{
-    const d=document.createElement('div'); d.textContent=l; d.classList.add('code-line');
-    if(i===highlight.line) d.classList.add('code-highlight'); codeView.appendChild(d);
-  });
-}
+    // Render all panels
+    function render(highlight={}){
+      // Free interns
+      const internsList = document.getElementById('internsList'); internsList.innerHTML='';
+      freeInterns.forEach(i=>{const li=document.createElement('li');li.textContent=`Intern ${i}`; if(highlight.intern===i)li.classList.add('highlight'); internsList.appendChild(li);});
+      // Teams
+      const teamsList = document.getElementById('teamsList'); teamsList.innerHTML='';
+      teamPrefs.forEach((_,t)=>{const li=document.createElement('li');const cur=teamsCurrent[t];li.textContent=cur!=null?`Team ${t}->Intern ${cur}`:`Team ${t}->None`; if(highlight.team===t)li.classList.add('highlight'); teamsList.appendChild(li);});
+      // Intern next choice
+      document.getElementById('choiceView').textContent = JSON.stringify(internNextChoice);
+      // Rankings
+      document.getElementById('rankingsView').textContent = JSON.stringify(teamRankings,null,2);
+      // Prefs
+      document.getElementById('prefsView').textContent = JSON.stringify(internPrefs,null,2);
+      // Data snapshot
+      document.getElementById('dataView').textContent =
+        `freeInterns: ${JSON.stringify(freeInterns)}\n`+
+        `internNextChoice: ${JSON.stringify(internNextChoice)}\n`+
+        `teamsCurrent: ${JSON.stringify(teamsCurrent)}`;
+      // Code
+      const codeView = document.getElementById('codeView'); codeView.innerHTML='';
+      codeLines.forEach((line,i)=>{
+        const div=document.createElement('div'); div.textContent=line;
+        div.classList.add('code-line');
+        if(i===highlight.line) div.classList.add('code-highlight');
+        codeView.appendChild(div);
+      });
+    }
 
-function nextStep(){
-  const hil={line:null}; if(!freeInterns.length){render();return;}
-  hil.line=codeLines.findIndex(l=>l.includes('freeInterns.pop')); render(hil);
-  const intern=freeInterns.pop();
-  hil.line=codeLines.findIndex(l=>l.includes('internNextChoice[intern]')); render(hil);
-  const choice=internNextChoice[intern]++;
-  hil.line=codeLines.findIndex(l=>l.includes('internPrefs[intern]')); render(hil);
-  const team=internPrefs[intern][choice];
-  hil.line=codeLines.findIndex(l=>l.includes('if (teamsCurrent[team]')); render(hil);
-  if(teamsCurrent[team]==null){ hil.line++; render(hil); teamsCurrent[team]=intern; }
-  else{
-    hil.line=codeLines.findIndex(l=>l.includes('if (teamRankings[team]')); render(hil);
-    const cur=teamsCurrent[team]; hil.line++; render(hil);
-    if(teamRankings[team][intern]<teamRankings[team][cur]){ hil.line++; render(hil); freeInterns.push(cur); teamsCurrent[team]=intern; }
-    else{ hil.line++; render(hil); freeInterns.push(intern); }
-  }
-  setTimeout(()=>render(),300);
-}
+    // Perform one step and highlight code
+    function nextStep(){
+      const hil = { line: null };
+      if(freeInterns.length===0){ render(); return; }
+      // Pop intern
+      hil.line = codeLines.findIndex(l=>l.includes('const intern = freeInterns.pop')); render(hil);
+      const intern = freeInterns.pop();
+      // Choice update
+      hil.line = codeLines.findIndex(l=>l.includes('internNextChoice[intern]')); render(hil);
+      const choice = internNextChoice[intern]++;
+      // Select team
+      hil.line = codeLines.findIndex(l=>l.includes('const team = internPrefs')); render(hil);
+      const team = internPrefs[intern][choice];
+      // Proposal
+      hil.line = codeLines.findIndex(l=>l.includes('if (teamsCurrent[team]')); render(hil);
+      if(teamsCurrent[team]==null){ hil.line++; render(hil); teamsCurrent[team]=intern; }
+      else{
+        hil.line = codeLines.findIndex(l=>l.includes('if (teamRankings[team]')); render(hil);
+        const current=teamsCurrent[team];
+        hil.line++; render(hil);
+        if(teamRankings[team][intern]<teamRankings[team][current]){ hil.line++; render(hil); freeInterns.push(current); teamsCurrent[team]=intern; }
+        else{ hil.line++; render(hil); freeInterns.push(intern); }
+      }
+      setTimeout(()=>render(),300);
+    }
 
-document.getElementById('nextBtn').onclick=nextStep;
-window.onload=init;
+    document.getElementById('nextBtn').onclick=nextStep;
+    document.body.insertAdjacentHTML('beforeend',
+      '<script id="srcCode" type="text/plain">'+
+      document.querySelector('script').textContent+
+      '<\/script>'
+    );
+    window.onload=init;
   </script>
 </body>
 </html>
